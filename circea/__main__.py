@@ -7,22 +7,6 @@ import os
 import argparse
 import pyfiglet
 
-
-
-lines = """\
-54126=TEST-BJR-01 Voici une phrase
-2100=YOU-SLT-OK Lioni Di Col
-12457=SRT-TUT-ALO_FO Code For
-"""
-
-for line in lines.splitlines():
-    value = line.split("=")[1]
-    value = value.split()[0]
-    print(value)
-
-
-
-
 def display_cache_information(cache_data):
     number_image = len(cache_data)
     plural = "s" if number_image > 0 else ""

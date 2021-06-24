@@ -1,21 +1,9 @@
 import datetime
 import heapq
 from PIL import Image  
-import pickle
-import cache
 import clip
 import torch
-import math
 
-
-def sqrt_cosine_similarity(x_v , y_v):
-    x_v = x_v.tolist()
-    y_v = y_v.tolist()
-    for i in range(len(y_v)):
-        y_v[i] = y_v[i][0]
-    top = sum(math.sqrt(abs(x*y)) for x , y in zip(x_v , y_v))
-    bottom = math.sqrt( sum(x_v) ) * math.sqrt( sum(y_v))
-    return top/bottom
 def frame_to_timecode(frame_rate , frame_index ):
     conversion =  datetime.timedelta(seconds=frame_rate*frame_index)
     return str(conversion)
