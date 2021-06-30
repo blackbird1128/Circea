@@ -51,18 +51,31 @@ while True:
     try:
         text_search = input(">")
         results = []
-        if text_search.startswith("cache:"):
+
+        if text_search.startswith("webcache:"):
+            args = text_search.split()
+            if len(args) > 1:
+                urls = text_search.split()[1]
+                urls_list = urls.split(",")
+                list_data = cache.get_images_data(urls_list )
+                data = cache.index_urls(list_data , urls_list , r"cache/cache_image.cache" ,32)
+            else:
+                print("invalid command\n cache: [urls]")
+                continue
+        elif text_search.startswith("cache:"):
             args = text_search.split()
             if len(args) > 1:
                 path = text_search.split()[1]
             else:
                 print("invalid command\ncache: [path]")
+                continue
             if not os.path.exists(path):
                 print("The path you entered isn't correct")
                 continue
             abs_path = os.path.abspath(path)
             print("adding " , abs_path , " images to cache ")
-            cache.index_frames_batch(abs_path , "cache/cache_image.cache", 32)
+            cache.get_files_in_directory(abs_path , [".png" , ".jpg"] )
+            cache.index_frames_batch(abs_path , "cache/cache_image.cache", 8)
             cache_data = cache.load_cache(r"cache/cache_image.cache")
             display_cache_information(cache_data)
         elif text_search.startswith("k:"):

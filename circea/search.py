@@ -36,7 +36,6 @@ def search_by_image(model  , preprocess, image_path , cache , device, k):
 
 
 def search_in_cache(model , text_input,cache , device , k):  
-
     text = clip.tokenize([  text_input]).to(device)
     text_features = model.encode_text(text)
     frame_similarities = []
