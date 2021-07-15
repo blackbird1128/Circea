@@ -7,6 +7,7 @@ from operator import itemgetter
 import os
 import pyfiglet
 
+
 print("\t\n",end="")
 pyfiglet.print_figlet("Circea")
 print("   A local image search engine \n\n")
@@ -19,11 +20,10 @@ else:
 print("loading model ...")
 print("""
 Help:
-(each command include the ":" in the name of the command)
 list of commands:
 cache: [path to a folder ]  recursively index every image in this folder to make them available for search.
 k: [number]  change the number of top results.
-checkpoint: 
+checkpoint:  display the current checkpoint information
 any text: look for images corresponding to the text
 """)
 model, preprocess = clip.load("ViT-B/32", device=device)
@@ -38,7 +38,6 @@ if os.path.exists("cache/checkpoint.cache"):
     print("It look like you have an unsaved caching operation in progress : ")
     check_data = cache.load_cache("cache/checkpoint.cache")
     operation_path = os.path.dirname(check_data[0][0])
-    print(check_data[1])
     list_files = check_data[0]
     index = check_data[1]
     print("the caching of the files in  :" , operation_path , "was interupted (progression :", round((index / len(list_files)), 2) * 100   ,"%)"  )
@@ -52,12 +51,15 @@ cache_data = cache.load_cache(r"cache/cache_image.cache")
 cli.display_cache_information(cache_data)
 
 num_top_result = 5
+command_dict = {}
+
+
+
 
 while True:
     try:
         text_search = input(">")
         results = []
-
         if text_search.startswith("webcache:"):
             args = text_search.split()
             if len(args) > 1:
@@ -96,16 +98,26 @@ while True:
                     print("invalid command\nk: [number]")
             except ValueError as e:
                 pass
-        elif(text_search.endswith(".jpg") or text_search.endswith(".png")):
-            results = search.search_by_image(model ,preprocess, text_search,cache_data  , device , num_top_result )
+        elif text_search.endswith(".jpg") or text_search.endswith(".png"):
+            text_input_tuple = text_search.partition(" ")
+            text_input = text_input_tuple[2] # empty if the separator isn't found / second part of text if the separator is found
+            results = []
+            if text_input == "":
+                print("using search by image ")
+                results = search.search_by_image(model ,preprocess, text_search ,cache_data  , device , num_top_result )
+                cli.display_result(results)
+            else:
+                print("using combined search ")
+                results = search.combined_search(model ,preprocess, text_search , text_input ,cache_data  , device , num_top_result )
+                cli.display_result(results)
+        elif text_search.startswith("exit"):
+            cli.close_application()
         else:
             if len(text_search) > 0:
-                print(f"k: {num_top_result}")
-                results = search.search_in_cache(model , text_search,cache_data,device,num_top_result)
-        results = sorted(results , reverse=True , key=itemgetter(0))
-        for i, result in enumerate(results):
-            print(f"{i+1}) image: {result[1]} | confidence : {result[0]}")
+                results = search.search_in_cache(model , text_search,cache_data,device,num_top_result)     
+                cli.display_result(results)
+                results2 = search.search_in_cache_v2(model , text_search,cache_data,device,num_top_result)     
+                print("v2")
+                cli.display_result(results2)
     except KeyboardInterrupt as e:
-        print("closing Circea ...")
-        print("have a nice day!\nbye")
-        exit()
+        cli.close_application()

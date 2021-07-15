@@ -108,6 +108,7 @@ def start_from_checkpoint(checkpoint_name , cache_name , batch_size , checkpoint
     list_data = data[2]
     add_to_cache(cache_name , list_data)
     index_images_batch(list_path[current_index:] ,cache_name , batch_size , checkpoint_frequence , checkpoint_name )
+    os.remove(checkpoint_name)
 
 
 def index_images_batch(list_files , cache_name , batch_size , checkpoint_frequence , checkpoint_name ):
@@ -176,8 +177,6 @@ def index_urls(list_data , list_urls , cache_name , batch_size):
     else:
         print("adding to cache")
         add_to_cache(cache_name , features_array) 
-
-
 
 if __name__ == '__main__':
     get_data_repr("image" , "circea/unsplash/micdrop.gif")
