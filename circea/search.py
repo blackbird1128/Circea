@@ -1,5 +1,6 @@
 import datetime
 import heapq
+import json
 from PIL import Image  
 import clip
 import torch
@@ -53,15 +54,7 @@ def search_in_cache(model , text_input,cache , device , k):
        and comparing the raw cosine product of each image  """  
     text = clip.tokenize([  text_input]).to(device)
     text_features = model.encode_text(text)
-    text_features /= text_features.norm(dim=-1, keepdim=True)
-    frame_similarities = []
-    with torch.no_grad():
-        for feature , frame_data in cache:
-            feature /= feature.norm(dim=-1, keepdim=True)
-            image_features = feature
-            similarity = image_features.T @ text_features.T
-            frame_similarities.append((similarity[0].item(),frame_data))
-    return heapSearch(frame_similarities , k)
+    return compare_vectors(text_features , cache, k)
 
 def search_in_cache_v2(model , text_input,cache , device , k):         
         text = clip.tokenize([  text_input, "a picture of something ", "a picture of" , "this feeling" ]).to(device)
@@ -82,16 +75,25 @@ def combined_search(model  , preprocess, image_path  , text_input , cache , devi
     second_image_feature = model.encode_image(image)
     second_image_feature /= second_image_feature.norm(dim=-1 , keepdim=True)
     text_vec = encode_search_query(text_input ,model , device )
-
     combined_feature = text_vec + second_image_feature * image_weight
     combined_feature /= combined_feature.norm(dim=-1 , keepdim=True)
-    frame_similarities = []
+    return compare_vectors(combined_feature , cache , k )
+
+def sort_into_categories(model , categories , cache , device ):
+    """sort the list of files in cache by categories , return a dict of categorie-> list of files corresponding"""
+    text = clip.tokenize(categories).to(device)
+    text_features = model.encode_text(text)
+    text_features /= text_features.norm(dim=-1, keepdim=True)
+    categories_images = dict()
     with torch.no_grad():
-        for feature , frame_data in cache:
+        for feature , frame_index in cache:
             feature /= feature.norm(dim=-1, keepdim=True)
-            first_image_feature = feature
-            similarity = first_image_feature @ combined_feature.T
-            frame_similarities.append((similarity[0].item(),frame_data))
-    return heapSearch(frame_similarities , k)
-
-
+            similarity = (100.0 * feature @ text_features.T).softmax(dim=-1)
+            top_index = torch.argmax(similarity)
+            top_index_categorie = categories[top_index]
+            if top_index_categorie in categories_images:
+                categories_images[top_index_categorie].append(frame_index)
+            else:
+                categories_images[top_index_categorie] = []
+                categories_images[top_index_categorie].append(frame_index)
+    return categories_images
