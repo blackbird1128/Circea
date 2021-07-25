@@ -1,32 +1,27 @@
 import cache
 import search
 import cli
+import filter
+import config
 import clip
 import torch
-from operator import itemgetter
 import os
 import pyfiglet
+import json
 
 
 print("\t\n",end="")
 pyfiglet.print_figlet("Circea")
 print("   A local image search engine \n\n")
-
+cli.print_help()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 if(device == "cuda"):
     print("Working on GPU")
 else:
     print("Working on CPU : Might be slower")
 print("loading model ...")
-print("""
-Help:
-list of commands:
-cache: [path to a folder ]  recursively index every image in this folder to make them available for search.
-k: [number]  change the number of top results.
-checkpoint:  display the current checkpoint information
-any text: look for images corresponding to the text
-""")
-model, preprocess = clip.load("ViT-B/32", device=device)
+
+model, preprocess = clip.load(config.env.model, device=device)
 if not os.path.exists("cache"):
     os.mkdir("cache")
 
@@ -42,35 +37,27 @@ if os.path.exists("cache/checkpoint.cache"):
     index = check_data[1]
     print("the caching of the files in  :" , operation_path , "was interupted (progression :", round((index / len(list_files)), 2) * 100   ,"%)"  )
     if cli.ask_for_confirmation("Do you want to restart from checkpoint ? " ):
-        cache.start_from_checkpoint("cache/checkpoint.cache" , "cache/cache_image.cache" , 32 )
+        cache.start_from_checkpoint("cache/checkpoint.cache" , "cache/cache_image.cache" , config.env.batch_size , config.env.checkpoint_interval)
     else:
         print("You can restart from this checkpoint later by starting a caching operation\nat the same location")
 
-
 cache_data = cache.load_cache(r"cache/cache_image.cache")
+cache_data = list(set(cache_data))
+cache_copy = cache_data
 cli.display_cache_information(cache_data)
-
-num_top_result = 5
-command_dict = {}
-
-
-
+num_top_result = config.env.top_k
 
 while True:
     try:
         text_search = input(">")
         results = []
         if text_search.startswith("webcache:"):
-            args = text_search.split()
-            if len(args) > 1:
-                urls = text_search.split()[1]
-                urls_list = urls.split(",")
-                list_data = cache.get_images_data(urls_list )
-                data = cache.index_urls(list_data , urls_list , r"cache/cache_image.cache" ,8)
-            else:
-                print("invalid command\n cache: [urls]")
-                continue
+            cli.cli_cache_urls(text_search)
         elif text_search.startswith("cache:"):
+            cache_vector = []
+            cache_files = []
+            if len(cache_data ) > 0:
+                cache_vector , cache_files  = zip(*cache_data)
             args = text_search.split()
             if len(args) > 1:
                 path = text_search.split()[1]
@@ -83,7 +70,8 @@ while True:
             abs_path = os.path.abspath(path)
             print("adding " , abs_path , " images to cache ")
             list_files = cache.get_files_in_directory(abs_path , [".png" , ".jpg", ".gif"] )
-            cache.index_images_batch(list_files , "cache/cache_image.cache", 32 , 64 , "cache/checkpoint.cache")
+            list_files = filter.filter_already_existing(cache_files , list_files)
+            cache.index_images_batch(list_files , "cache/cache_image.cache",config.env.batch_size , config.env.checkpoint_interval , "cache/checkpoint.cache")
             cache_data = cache.load_cache(r"cache/cache_image.cache")
             cli.display_cache_information(cache_data)
         elif text_search.startswith("k:"):
@@ -103,15 +91,38 @@ while True:
             text_input = text_input_tuple[2] # empty if the separator isn't found / second part of text if the separator is found
             results = []
             if text_input == "":
-                print("using search by image ")
+                print("using search by image :")
                 results = search.search_by_image(model ,preprocess, text_search ,cache_data  , device , num_top_result )
                 cli.display_result(results)
             else:
-                print("using combined search ")
+                print("using combined search :")
                 results = search.combined_search(model ,preprocess, text_search , text_input ,cache_data  , device , num_top_result )
                 cli.display_result(results)
         elif text_search.startswith("exit"):
             cli.close_application()
+        elif text_search.startswith("clearcache:"):
+            if cli.ask_for_confirmation("Are you sure you want to delete the cache ?"):
+                os.remove("cache/cache_image.cache")
+        elif text_search.startswith("filter:"):
+            args = cli.get_command_args(text_search , ",")
+            filtered_files = []
+            for arg in args:
+                filtered_files.extend(filter.filter_file_data(cache_data , arg))
+            cache_data = filtered_files
+        elif text_search.startswith("unfilter:"):
+            cache_data = cache_copy
+        elif text_search.startswith("sort:"):
+            args = text_search.split(":")
+            if len(args) > 1:
+                categorie_list = cli.get_command_args(text_search, ",")
+                categories_images = search.sort_into_categories(model ,  categorie_list, cache_data , device)
+                search_file_name = filter.generate_easy_id() + ".json"
+                with open("cache/" + search_file_name , "w") as default_file:
+                    default_file.write(json.dumps(categories_images , indent=4))
+                    print("results saved in " +  "cache/"  + search_file_name)
+            else:
+                print("invalid command\n sort: [categories]")
+                continue
         else:
             if len(text_search) > 0:
                 results = search.search_in_cache(model , text_search,cache_data,device,num_top_result)     

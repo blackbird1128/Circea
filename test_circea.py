@@ -5,8 +5,10 @@ from PIL import Image
 import random
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'circea')))
 import circea.cache
 import circea.filter
+import circea.cli
 
 def create_test_images(num_images):
     """this function create {num_images} test images and return the number
@@ -44,24 +46,20 @@ def test_chunks():
     assert len(list_chunk) == 3
     assert len(list_chunk[0]) == 3
 
-def test_checkpoint():
-    num_images = 5
-    create_test_images(num_images)
-    list_test_images =circea.cache.get_files_in_directory("tests/images" , [".png"])
-    assert len(list_test_images) == num_images
-    print("starting to index")
-    circea.cache.index_images_batch(list_test_images , "tests/checkpoint_test.cache",  2 , 1 , "tests/checkpoint.check")
-    checkpoint_data = circea.cache.load_cache("tests/checkpoint.check")
-    print(checkpoint_data)
-    list_path = checkpoint_data[0]
-    current_index = checkpoint_data[1]
-    list_data = checkpoint_data[1]
-    assert list_path == list_test_images
-    assert current_index == 5
 
+def test_existing_filter():
+    list_existing_files = [f"img{i}" for i in range(10)]
+    list_new_files = ["img1" , "img4" , "img42"]
+    list_new_file_filtered = ["img42"]
+    assert circea.filter.filter_already_existing(list_existing_files , list_new_files ) == list_new_file_filtered
 
-
-
-
+def test_parsing_args():
+    text_input = "command: arg1 , arg2 , arg3"
+    assert circea.cli.get_command_args(text_input , ",") == ["arg1" , "arg2" , "arg3"]
+    text_input = "command: "
+    arg_list = [f"arg{i}" for i in range(100)]
+    text_inputs_args_str = " , ".join(arg_list)
+    text_input += text_inputs_args_str
+    assert circea.cli.get_command_args(text_input , ",") == arg_list
 
 
